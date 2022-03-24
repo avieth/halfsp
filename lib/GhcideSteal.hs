@@ -42,7 +42,7 @@ realSrcSpanToRange real =
 
 realSrcLocToPosition :: RealSrcLoc -> Position
 realSrcLocToPosition real =
-  Position (srcLocLine real - 1) (srcLocCol real - 1)
+  Position (intToUInt (srcLocLine real) - 1) (intToUInt (srcLocCol real) - 1)
 
 -- | Extract a file name from a GHC SrcSpan (use message for unhelpful ones)
 -- FIXME This may not be an _absolute_ file name, needs fixing.
@@ -83,7 +83,7 @@ hoverInfo :: DynFlags -> Array TypeIndex HieTypeFlat -> HieAST TypeIndex -> (May
 hoverInfo dflags typeLookup ast = (Just range, prettyNames ++ pTypes)
   where
     pTypes
-      | length names == 1 = dropEnd1 $ map wrapHaskell prettyTypes
+      | Prelude.length names == 1 = dropEnd1 $ map wrapHaskell prettyTypes
       | otherwise = map wrapHaskell prettyTypes
 
     range = realSrcSpanToRange $ nodeSpan ast
@@ -145,6 +145,12 @@ locationsAtPoint hiedb wsroot imports pos ast =
       modToLocation m = (\fs -> pure $ Location fs zeroRange) <$> M.lookup m imports
    in nubOrd . concat <$> mapMaybeM (either (pure . modToLocation) $ nameToLocation hiedb wsroot) ns
 
+uintToInt :: UInt -> Int
+uintToInt = fromIntegral
+
+intToUInt :: Int -> UInt
+intToUInt = fromIntegral
+
 pointCommand :: HieASTs t -> Position -> (HieAST t -> a) -> [a]
 pointCommand hf pos k =
   catMaybes $
@@ -154,7 +160,7 @@ pointCommand hf pos k =
           Nothing -> Nothing
           Just ast' -> Just $ k ast'
   where
-    sloc fs = mkRealSrcLoc fs (line + 1) (cha + 1)
+    sloc fs = mkRealSrcLoc fs (uintToInt line + 1) (uintToInt cha + 1)
     sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
     line = _line pos
     cha = _character pos
@@ -187,8 +193,8 @@ nameToLocation hiedb wsroot name = runMaybeT $
 
 defRowToLocation :: Monad m => FilePath -> Res DefRow -> MaybeT m Location
 defRowToLocation wsroot (row :. info) = do
-  let start = Position (defSLine row - 1) (defSCol row - 1)
-      end = Position (defELine row - 1) (defECol row - 1)
+  let start = Position (intToUInt (defSLine row) - 1) (intToUInt (defSCol row) - 1)
+      end = Position (intToUInt (defELine row) - 1) (intToUInt (defECol row) - 1)
       range = Range start end
   file <- case modInfoSrcFile info of
     Just src -> pure $ filePathToUri $ wsroot </> src
